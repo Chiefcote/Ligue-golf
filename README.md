@@ -34,8 +34,8 @@ Dans le dépôt GitHub : *Settings → Pages → Branch* : choisir la branche et
 
 ## Accès : lecture seule ou modification
 
-Par défaut, le site est en **lecture seule** : tout le monde voit le classement, les parties, les joueurs
-et les terrains (lus dans `data/ligue.json`), sans pouvoir rien changer.
+Par défaut, le site est en **lecture seule** : on voit tous les onglets et toutes les statistiques,
+sans pouvoir rien changer.
 
 Pour modifier, toucher **🔒 Lecture seule** en haut à droite et entrer le mot de passe
 (par défaut : `golf2026`). Le navigateur reste en mode édition jusqu'à ce qu'on touche **🔓 Mode édition**.

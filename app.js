@@ -21,7 +21,7 @@ let tabState = {}; // filtres, joueur sélectionné, partie en édition
 let editor = false; // false = lecture seule
 
 // ---------- Accès ----------
-// Lecture seule par défaut : on lit toujours data/ligue.json du site.
+// Lecture seule par défaut : on voit tout (mêmes données qu'en édition), mais sans pouvoir modifier.
 // Le mode édition se débloque avec un mot de passe. Ce n'est pas une vraie sécurité
 // (le code est public) : ça empêche surtout les modifications par erreur.
 
@@ -37,27 +37,13 @@ async function login() {
   if (await sha256(pw) !== editHash()) { alert('Mot de passe incorrect.'); return; }
   editor = true;
   try { localStorage.setItem(EDITOR_KEY, '1'); } catch (e) { /* ignore */ }
-  await load();
   render();
-}
-
-// En lecture seule : prévient si ce navigateur a des parties qui ne sont pas encore publiées.
-function localDataNotice() {
-  if (editor) return '';
-  let local = null;
-  try { local = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { /* ignore */ }
-  const n = local?.games?.length || 0;
-  if (n <= db.games.length) return '';
-  return `<div class="card notice">⚠️ Ce navigateur contient <b>${n} partie${n > 1 ? 's' : ''}</b> ${n > 1 ? 'qui ne sont pas encore publiées' : 'qui n\'est pas encore publiée'} sur le site.
-    Touche <b>🔒 Lecture seule</b> en haut et entre le mot de passe pour les voir, puis
-    <i>Réglages → Exporter</i> et remplace <code>data/ligue.json</code> dans le dépôt pour que tout le monde les voie.</div>`;
 }
 
 async function logout() {
   editor = false;
   try { localStorage.removeItem(EDITOR_KEY); } catch (e) { /* ignore */ }
   tabState.editing = null;
-  db = await fetchSiteData();
   render();
 }
 
@@ -75,7 +61,6 @@ function normalize(d) {
 }
 
 async function load() {
-  if (!editor) { db = await fetchSiteData(); return; }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) { db = normalize(JSON.parse(raw)); return; }
@@ -212,7 +197,7 @@ function render() {
   const acc = document.getElementById('access');
   acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
   acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
-  view().innerHTML = localDataNotice() + fn();
+  view().innerHTML = fn();
   bind();
 }
 
