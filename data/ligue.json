@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "settings": { "participation": 1, "parAdversaire": 1, "bonusVictoire": 2 },
+  "players": [],
+  "courses": [],
+  "games": []
+}
