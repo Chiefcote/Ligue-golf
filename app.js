@@ -41,6 +41,18 @@ async function login() {
   render();
 }
 
+// En lecture seule : prévient si ce navigateur a des parties qui ne sont pas encore publiées.
+function localDataNotice() {
+  if (editor) return '';
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { /* ignore */ }
+  const n = local?.games?.length || 0;
+  if (n <= db.games.length) return '';
+  return `<div class="card notice">⚠️ Ce navigateur contient <b>${n} partie${n > 1 ? 's' : ''}</b> ${n > 1 ? 'qui ne sont pas encore publiées' : 'qui n\'est pas encore publiée'} sur le site.
+    Touche <b>🔒 Lecture seule</b> en haut et entre le mot de passe pour les voir, puis
+    <i>Réglages → Exporter</i> et remplace <code>data/ligue.json</code> dans le dépôt pour que tout le monde les voie.</div>`;
+}
+
 async function logout() {
   editor = false;
   try { localStorage.removeItem(EDITOR_KEY); } catch (e) { /* ignore */ }
@@ -200,7 +212,7 @@ function render() {
   const acc = document.getElementById('access');
   acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
   acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
-  view().innerHTML = fn();
+  view().innerHTML = localDataNotice() + fn();
   bind();
 }
 
