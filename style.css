@@ -90,3 +90,6 @@ label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 4
 .teambox { border: 1px dashed var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
 details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
 .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+.standings th, .standings td { white-space: nowrap; }
+.standings .grp { border-left: 1px solid var(--line); padding-left: 10px; }
+.standings tr.groups th { text-align: center; border-bottom: 0; padding-bottom: 0; }

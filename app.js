@@ -110,7 +110,7 @@ function playerStats(pid, games) {
   const s = {
     games: 0, points: 0, wins: 0,
     solo: { games: 0, wins: 0, vsPar: [], best: null },
-    team: { games: 0, wins: 0, losses: 0, partners: {} },
+    team: { games: 0, wins: 0, losses: 0, partners: {}, best: null },
     stat: {}, statN: {}, holes: 0, greensHoles: 0,
   };
   for (const g of games) {
@@ -128,6 +128,7 @@ function playerStats(pid, games) {
     } else {
       s.team.games += 1;
       if (res.won) s.team.wins += 1; else s.team.losses += 1;
+      if (s.team.best == null || vsPar < s.team.best.vsPar) s.team.best = { vsPar, score: +res.team.score, game: g };
       res.team.players.filter(p => p !== pid).forEach(p => {
         const ps = (s.team.partners[p] ||= { games: 0, wins: 0 });
         ps.games += 1; if (res.won) ps.wins += 1;
@@ -175,6 +176,7 @@ function renderStandings() {
   if (!rows.length) {
     return `<div class="card empty">Aucune partie pour l'instant.<br><br><button class="primary" data-action="new-game">+ Ajouter une partie</button></div>`;
   }
+  const best = b => (b ? `<span title="${esc(b.score)} — ${esc(fmtDate(b.game.date))}, ${esc(courseName(b.game.courseId))}">${fmtPar(b.vsPar)}</span>` : '—');
   const body = rows.map((r, i) => `
     <tr class="${i === 0 ? 'rank1' : ''}" data-action="open-player" data-id="${r.p.id}" style="cursor:pointer">
       <td>${i + 1}</td>
@@ -184,16 +186,27 @@ function renderStandings() {
       <td class="num">${r.s.wins}</td>
       <td class="num">${fmtNum(r.s.points / r.s.games, 2)}</td>
       <td class="num">${fmtPar(r.s.avgVsPar)}</td>
+      <td class="num grp">${r.s.solo.games}</td>
+      <td class="num">${r.s.solo.wins}</td>
+      <td class="num">${best(r.s.solo.best)}</td>
+      <td class="num grp">${r.s.team.games}</td>
+      <td class="num">${r.s.team.wins}</td>
+      <td class="num">${best(r.s.team.best)}</td>
     </tr>`).join('');
   const last = games[0];
   return `
     <div class="row between"><h2>Classement</h2>${seasonSelect()}</div>
     <div class="card scroll">
-      <table>
-        <thead><tr><th>#</th><th>Joueur</th><th class="num">Pts</th><th class="num">PJ</th><th class="num">V</th><th class="num">Pts/PJ</th><th class="num">Moy. solo</th></tr></thead>
+      <table class="standings">
+        <thead>
+          <tr class="groups"><th colspan="7"></th><th colspan="3" class="grp">Solo</th><th colspan="3" class="grp">Équipe</th></tr>
+          <tr><th>#</th><th>Joueur</th><th class="num">Pts</th><th class="num">PJ</th><th class="num">V</th><th class="num">Pts/PJ</th><th class="num">Moy. solo</th>
+            <th class="num grp">PJ</th><th class="num">V</th><th class="num">Meill.</th>
+            <th class="num grp">PJ</th><th class="num">V</th><th class="num">Meill.</th></tr>
+        </thead>
         <tbody>${body}</tbody>
       </table>
-      <p class="muted">PJ = parties jouées · V = victoires · Moy. solo = score moyen par rapport à la normale en « chacun pour soi ».</p>
+      <p class="muted">PJ = parties jouées · V = victoires · Moy. solo = score moyen par rapport à la normale en « chacun pour soi » · Meill. = meilleur score par rapport à la normale.</p>
     </div>
     ${last ? `<h3>Dernière partie</h3>${gameCard(last)}` : ''}
     <div class="row"><button class="primary" data-action="new-game">+ Ajouter une partie</button></div>`;
