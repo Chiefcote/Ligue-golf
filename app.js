@@ -1,13 +1,16 @@
 // Ligue de golf — tout fonctionne dans le navigateur.
-// Les données sont gardées dans le navigateur (localStorage). Le bouton « Publier »
-// les écrit dans data/ligue.json sur GitHub pour que tout le monde les voie.
+// Les données sont partagées en ligne (jsonblob.com) : un éditeur modifie, tout le monde
+// voit le changement en quelques secondes. Une copie reste dans chaque navigateur.
 
 const STORAGE_KEY = 'ligue-golf';
 const EDITOR_KEY = 'ligue-golf-editeur';
 const BACKUP_KEY = 'ligue-golf-copie';
-const TOKEN_KEY = 'ligue-golf-cle-github';
-// Où publier les données (le dépôt et la branche que GitHub Pages affiche).
-const GITHUB = { repo: 'Chiefcote/Ligue-golf', branch: 'claude/golf-league-stats-site-yvp77s', path: 'data/ligue.json' };
+const CLOUD_KEY = 'ligue-golf-nuage';
+// Stockage en ligne partagé (jsonblob.com, gratuit, sans compte).
+// Une fois créé (Réglages → Partage en ligne), mettre son code ici pour que tous les visiteurs le trouvent.
+const CLOUD_ID = '';
+const CLOUD_API = 'https://jsonblob.com/api/jsonBlob';
+const REFRESH_MS = 20000; // vérifie les mises à jour toutes les 20 secondes
 // Empreinte SHA-256 du mot de passe par défaut (« golf2026 »). Se change dans Réglages.
 const DEFAULT_EDIT_HASH = 'c3d202d707368179b25dd25eead59c9dd6f45f55e65347c0e23485dfba34e403';
 const DEFAULT_SETTINGS = { participation: 1, parAdversaire: 1, bonusVictoire: 2 };
@@ -42,6 +45,7 @@ async function login() {
   editor = true;
   try { localStorage.setItem(EDITOR_KEY, '1'); } catch (e) { /* ignore */ }
   render();
+  refresh();
 }
 
 async function logout() {
@@ -64,18 +68,122 @@ function normalize(d) {
   return out;
 }
 
-// On prend la version la plus récente entre ce navigateur et le site.
-async function load() {
-  let local = null;
+// ----- Partage en ligne -----
+
+function cloudId() {
+  if (CLOUD_ID) return CLOUD_ID;
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('ligue');
+    if (fromUrl && /^[\w-]+$/.test(fromUrl)) { localStorage.setItem(CLOUD_KEY, fromUrl); return fromUrl; }
+    return localStorage.getItem(CLOUD_KEY) || '';
+  } catch (e) { return ''; }
+}
+
+let sync = { state: 'local', at: null }; // local | ok | envoi | erreur | horsligne
+let pushTimer = null;
+
+async function fetchCloud() {
+  const id = cloudId(); if (!id) return null;
+  const res = await fetch(`${CLOUD_API}/${id}?t=${Date.now()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  if (!res.ok) throw new Error('lecture ' + res.status);
+  return normalize(await res.json());
+}
+
+async function pushCloud() {
+  const id = cloudId(); if (!id || !editor) return;
+  sync.state = 'envoi'; renderSync();
+  try {
+    const res = await fetch(`${CLOUD_API}/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(db),
+    });
+    if (!res.ok) throw new Error('envoi ' + res.status);
+    db.syncedAt = db.updatedAt; cacheLocal();
+    sync = { state: 'ok', at: new Date() };
+  } catch (e) {
+    sync.state = 'erreur';
+  }
+  renderSync();
+}
+
+function schedulePush() {
+  if (!cloudId()) return;
+  clearTimeout(pushTimer);
+  sync.state = 'envoi'; renderSync();
+  pushTimer = setTimeout(pushCloud, 600);
+}
+
+const hasUnsent = () => cloudId() && db.updatedAt && db.updatedAt !== db.syncedAt;
+
+function cacheLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
+}
+
+function readLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) local = normalize(JSON.parse(raw));
-  } catch (e) { /* stockage indisponible */ }
-  const site = await fetchSiteData();
-  if (local && (local.updatedAt || '') >= (site.updatedAt || '')) { db = local; return; }
-  if (local && local.games.length) { db = local; backup('Version plus récente du site chargée.'); tabState.undo = null; }
-  db = site;
-  if (local) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ } }
+    return raw ? normalize(JSON.parse(raw)) : null;
+  } catch (e) { return null; }
+}
+
+// Au démarrage : la version en ligne d'abord ; sinon la copie du navigateur ; sinon le fichier du site.
+async function load() {
+  const local = readLocal();
+  if (cloudId()) {
+    try {
+      const cloud = await fetchCloud();
+      // Changements faits ici mais pas encore envoyés (ex. pas de réseau) : on les garde et on les envoie.
+      if (editor && local && local.updatedAt && local.updatedAt !== local.syncedAt && local.updatedAt > (cloud.updatedAt || '')) {
+        db = local; schedulePush(); return;
+      }
+      if (local && local.games.length > cloud.games.length) { db = local; backup('Version en ligne chargée.'); tabState.undo = null; }
+      db = cloud; db.syncedAt = db.updatedAt; cacheLocal();
+      sync = { state: 'ok', at: new Date() };
+      return;
+    } catch (e) { sync.state = 'horsligne'; }
+  }
+  db = local || await fetchSiteData();
+}
+
+// Vérifie régulièrement s'il y a du nouveau (pour les visiteurs et les autres éditeurs).
+async function refresh() {
+  if (!cloudId() || document.hidden || tabState.editing || hasUnsent() || sync.state === 'envoi') return;
+  try {
+    const cloud = await fetchCloud();
+    sync = { state: 'ok', at: new Date() };
+    if ((cloud.updatedAt || '') !== (db.updatedAt || '')) {
+      db = cloud; db.syncedAt = db.updatedAt; cacheLocal();
+      if (!document.activeElement || !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) render();
+    } else renderSync();
+  } catch (e) { sync.state = 'horsligne'; renderSync(); }
+}
+
+function renderSync() {
+  const el = document.getElementById('sync'); if (!el) return;
+  if (!cloudId()) { el.textContent = ''; return; }
+  const t = { ok: '☁️ À jour', envoi: '⏳ Envoi…', erreur: '⚠️ Non envoyé', horsligne: '⚠️ Hors ligne', local: '' }[sync.state] || '';
+  el.textContent = t;
+  el.title = sync.state === 'erreur' ? 'Toucher pour réessayer' : '';
+}
+
+async function createCloud() {
+  if (cloudId()) return;
+  if (!confirm(`Créer l'espace en ligne de la ligue avec les données de ce navigateur (${nbParties(db.games.length)}) ?`)) return;
+  try {
+    db.updatedAt = new Date().toISOString();
+    const res = await fetch(CLOUD_API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(db),
+    });
+    if (!res.ok) throw new Error('erreur ' + res.status);
+    const loc = res.headers.get('Location') || res.headers.get('X-jsonblob') || '';
+    const id = loc.split('/').pop();
+    if (!id) throw new Error('code introuvable');
+    localStorage.setItem(CLOUD_KEY, id);
+    db.syncedAt = db.updatedAt; cacheLocal();
+    sync = { state: 'ok', at: new Date() };
+    render();
+  } catch (e) {
+    alert('❌ Impossible de créer l\'espace en ligne : ' + e.message);
+  }
 }
 
 async function fetchSiteData() {
@@ -89,79 +197,8 @@ async function fetchSiteData() {
 function save() {
   if (!editor) return;
   db.updatedAt = new Date().toISOString();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
-}
-
-// ----- Publier sur le site (GitHub) -----
-// Écrit data/ligue.json dans le dépôt avec une clé GitHub gardée dans ce navigateur.
-// GitHub Pages met ensuite le site à jour (environ 1 minute).
-
-const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } };
-const unpublished = () => editor && (db.updatedAt || '') > (db.publishedAt || '') ||
-  editor && !db.publishedAt && db.games.length > 0;
-
-function toBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
-  return btoa(bin);
-}
-function fromBase64(b64) {
-  const bin = atob(b64.replace(/\s/g, ''));
-  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
-}
-
-async function publish() {
-  const token = getToken();
-  if (!token) {
-    alert('Il faut d\'abord ajouter ta clé GitHub dans Réglages → Publier sur le site.');
-    currentTab = 'reglages'; render(); return;
-  }
-  const url = `https://api.github.com/repos/${GITHUB.repo}/contents/${GITHUB.path}`;
-  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
-  tabState.publishing = true; render();
-  try {
-    const cur = await fetch(`${url}?ref=${encodeURIComponent(GITHUB.branch)}&t=${Date.now()}`, { headers, cache: 'no-store' });
-    if (cur.status === 401) throw new Error('Clé GitHub invalide ou expirée.');
-    if (!cur.ok && cur.status !== 404) throw new Error(`GitHub a refusé la lecture (erreur ${cur.status}).`);
-    const curJson = cur.ok ? await cur.json() : null;
-    // Quelqu'un d'autre a-t-il publié depuis ma dernière publication ?
-    if (curJson?.content) {
-      let remote = null; try { remote = JSON.parse(fromBase64(curJson.content)); } catch (e) { /* ignore */ }
-      if (remote?.publishedAt && remote.publishedAt > (db.publishedAt || '') && db.publishedAt) {
-        const ok = confirm(`⚠️ Quelqu'un d'autre a publié depuis ta dernière publication (${nbParties(remote.games?.length || 0)} sur le site, ${nbParties(db.games.length)} ici).\n\nPublier quand même remplacera sa version. Continuer ?`);
-        if (!ok) return;
-      }
-    }
-    const now = new Date().toISOString();
-    const data = { ...db, updatedAt: now, publishedAt: now };
-    const res = await fetch(url, {
-      method: 'PUT', headers,
-      body: JSON.stringify({
-        message: `Mise à jour des parties (${nbParties(data.games.length)})`,
-        content: toBase64(JSON.stringify(data, null, 2) + '\n'),
-        branch: GITHUB.branch,
-        ...(curJson?.sha ? { sha: curJson.sha } : {}),
-      }),
-    });
-    if (res.status === 401) throw new Error('Clé GitHub invalide ou expirée.');
-    if (res.status === 403 || res.status === 404) throw new Error('Cette clé GitHub n\'a pas le droit d\'écrire dans le dépôt (il faut « Contents : Read and write »).');
-    if (res.status === 409) throw new Error('Le fichier a changé pendant la publication. Réessaie.');
-    if (!res.ok) throw new Error(`GitHub a refusé la publication (erreur ${res.status}).`);
-    db = data;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
-    tabState.undo = null;
-    alert('✅ Publié ! Le site sera à jour pour tout le monde d\'ici 1 à 2 minutes.');
-  } catch (e) {
-    alert('❌ Publication impossible : ' + (e.message || 'problème de connexion.'));
-  } finally {
-    tabState.publishing = false; render();
-  }
-}
-
-function publishBanner() {
-  if (!unpublished()) return '';
-  return `<div class="card notice row between"><span>📝 Tu as des changements qui ne sont pas encore sur le site.</span>
-    <button class="primary small" data-action="publish" ${tabState.publishing ? 'disabled' : ''}>${tabState.publishing ? 'Publication…' : '📤 Publier'}</button></div>`;
+  cacheLocal();
+  schedulePush();
 }
 
 // ----- Copie de sécurité -----
@@ -309,8 +346,15 @@ function render() {
   const acc = document.getElementById('access');
   acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
   acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
-  view().innerHTML = undoBanner() + (tabState.editing ? '' : publishBanner()) + fn();
+  view().innerHTML = undoBanner() + setupBanner() + fn();
   bind();
+  renderSync();
+}
+
+function setupBanner() {
+  if (!editor || cloudId() || currentTab === 'reglages') return '';
+  return `<div class="card notice row between"><span>⚠️ Le partage en ligne n'est pas activé : les visiteurs ne voient pas tes changements.</span>
+    <button class="primary small" data-action="create-cloud">☁️ Activer</button></div>`;
 }
 
 function seasonSelect() {
@@ -628,12 +672,10 @@ function renderSettings() {
     <div class="edit-only">
     <h2>Données</h2>
     <div class="card">
-      <p class="muted">Les données sont sauvegardées dans ce navigateur. Pour les partager avec la gang, exporte le fichier
-        et remplace <code>data/ligue.json</code> dans le dépôt GitHub : tout le monde verra la même chose.</p>
+      <p class="muted">Pour garder une copie chez toi, exporte le fichier de temps en temps.</p>
       <div class="row">
         <button data-action="export">⬇️ Exporter (JSON)</button>
         <label class="btn" style="margin:0;color:var(--text);font-size:1rem">⬆️ Importer<input type="file" accept=".json" data-action="import" hidden></label>
-        <button data-action="reload-site">🔄 Recharger la version du site</button>
       </div>
       ${(() => {
         const b = getBackup();
@@ -641,30 +683,20 @@ function renderSettings() {
           <button data-action="restore-backup">↩️ Restaurer la copie de sécurité</button>` : '';
       })()}
     </div>
-    <h2>Publier sur le site</h2>
+    <h2>Partage en ligne</h2>
     <div class="card">
-      <p>Le bouton <b>📤 Publier</b> envoie les parties de ce navigateur sur le site, pour que tout le monde les voie.
-        Il faut une clé GitHub (une seule fois par appareil) :</p>
-      <ol class="muted">
-        <li>Ouvre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Fine-grained token</a>.</li>
-        <li>Nom : « Ligue golf ». Expiration : au choix (ex. 1 an).</li>
-        <li><i>Repository access</i> → <i>Only select repositories</i> → <b>Ligue-golf</b>.</li>
-        <li><i>Permissions</i> → <i>Repository permissions</i> → <b>Contents : Read and write</b>.</li>
-        <li><i>Generate token</i>, copie la clé et colle-la ici.</li>
-      </ol>
-      <div class="row">
-        <input id="gh-token" type="password" placeholder="${getToken() ? 'Clé enregistrée ✓ (coller pour remplacer)' : 'github_pat_…'}" style="flex:1;width:auto" autocomplete="off">
-        <button data-action="save-token">Enregistrer la clé</button>
-        ${getToken() ? '<button class="danger" data-action="forget-token">Oublier</button>' : ''}
-      </div>
-      <div class="row" style="margin-top:12px"><button class="primary" data-action="publish">📤 Publier maintenant</button>
-        <span class="muted">${db.publishedAt ? 'Dernière publication : ' + new Date(db.publishedAt).toLocaleString('fr-CA') : 'Jamais publié depuis ce navigateur.'}</span></div>
-      <p class="muted">La clé reste seulement dans ce navigateur. Ne la partage pas : elle permet de modifier le dépôt.</p>
+      ${cloudId() ? `
+        <p>✅ Activé. Chaque changement fait en mode édition est envoyé en ligne, et tout le monde le voit en quelques secondes.</p>
+        ${CLOUD_ID ? '' : `<p class="muted">Dernière étape : envoie ce code à Claude pour qu'il l'ajoute au site.
+          D'ici là, partage plutôt ce lien avec la gang :</p>
+          <p><code>${esc(cloudId())}</code></p>
+          <p><input readonly value="${esc(location.origin + location.pathname + '?ligue=' + cloudId())}" onclick="this.select()"></p>`}`
+      : `<p>Pas encore activé : les changements restent dans ce navigateur.</p>
+        <button class="primary" data-action="create-cloud">☁️ Activer le partage en ligne</button>`}
     </div>
     <h2>Accès</h2>
     <div class="card">
-      <p class="muted">Sans mot de passe, le site est en lecture seule. Après un changement de mot de passe,
-        exporte le fichier et remplace <code>data/ligue.json</code> pour qu'il s'applique à tout le monde.</p>
+      <p class="muted">Sans mot de passe, le site est en lecture seule.</p>
       <div class="row"><button data-action="change-password">🔑 Changer le mot de passe</button></div>
     </div>
     </div>`;
@@ -688,8 +720,7 @@ function bind() {
 const draft = () => tabState.editing;
 
 const EDIT_ACTIONS = new Set(['new-game', 'edit-game', 'save-game', 'delete-game', 'add-player', 'add-player-inline',
-  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password', 'undo', 'restore-backup',
-  'publish', 'save-token', 'forget-token']);
+  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'change-password', 'undo', 'restore-backup', 'create-cloud']);
 
 const binds = {
   date: el => { draft().date = el.value; },
@@ -810,29 +841,10 @@ const actions = {
     if (!a) return;
     if (prompt('Confirme le nouveau mot de passe :') !== a) { alert('Les deux mots de passe ne sont pas pareils.'); return; }
     db.settings.editHash = await sha256(a); save();
-    alert('Mot de passe changé dans ce navigateur. Exporte et remplace data/ligue.json pour l\'appliquer au site.');
-  },
-  'reload-site': async () => {
-    const site = await fetchSiteData();
-    let msg = `Remplacer les données de ce navigateur (${nbParties(db.games.length)}) par celles du site (${nbParties(site.games.length)}) ?`;
-    if (site.games.length < db.games.length) msg = `⚠️ Attention : le site contient MOINS de parties (${site.games.length}) que ce navigateur (${db.games.length}).\n\n` + msg;
-    if (!confirm(msg)) return;
-    backup('Données remplacées par celles du site.');
-    db = site; save(); render();
+    alert('Mot de passe changé.');
   },
   undo: () => restoreBackup(),
-  publish: () => { if (!tabState.publishing) publish(); },
-  'save-token': () => {
-    const v = document.getElementById('gh-token').value.trim();
-    if (!v) return;
-    try { localStorage.setItem(TOKEN_KEY, v); } catch (e) { /* ignore */ }
-    alert('Clé enregistrée dans ce navigateur.'); render();
-  },
-  'forget-token': () => {
-    if (!confirm('Oublier la clé GitHub de ce navigateur ?')) return;
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
-    render();
-  },
+  'create-cloud': () => createCloud(),
   'dismiss-undo': () => { tabState.undo = null; render(); },
   'restore-backup': () => {
     const b = getBackup(); if (!b) return;
@@ -857,4 +869,16 @@ if (!document.getElementById('access')) {
 document.getElementById('access').addEventListener('click', () => (editor ? logout() : login()));
 
 try { editor = localStorage.getItem(EDITOR_KEY) === '1'; } catch (e) { /* ignore */ }
-load().then(render);
+// Indicateur de synchronisation (à côté du bouton d'accès).
+if (!document.getElementById('sync')) {
+  const sp = document.createElement('button');
+  sp.id = 'sync'; sp.className = 'small sync';
+  document.getElementById('access').before(sp);
+}
+document.getElementById('sync').addEventListener('click', () => { if (sync.state === 'erreur') pushCloud(); else refresh(); });
+
+load().then(() => {
+  render();
+  setInterval(refresh, REFRESH_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+});

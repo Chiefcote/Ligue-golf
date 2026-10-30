@@ -39,23 +39,23 @@ sans pouvoir rien changer.
 
 Pour modifier, toucher **🔒 Lecture seule** en haut à droite et entrer le mot de passe
 (par défaut : `golf2026`). Le navigateur reste en mode édition jusqu'à ce qu'on touche **🔓 Mode édition**.
-Le mot de passe se change dans *Réglages → Accès* (puis exporter et remplacer `data/ligue.json`).
+Le mot de passe se change dans *Réglages → Accès*.
 
 ⚠️ Ce mot de passe empêche les modifications par erreur, mais ce n'est pas une vraie sécurité :
-le site n'a pas de serveur. Les vraies données partagées ne changent que lorsqu'on remplace
-`data/ligue.json` dans le dépôt GitHub, ce qui demande un accès au dépôt.
+le site n'a pas de serveur. Ça empêche les modifications par erreur, pas un pirate.
 
-## Où sont les données ? Comment les publier ?
+## Où sont les données ?
 
-Les parties entrées sont d'abord sauvegardées dans le navigateur. Pour que tout le monde les voie,
-toucher **📤 Publier** (en mode édition) : le site écrit `data/ligue.json` dans le dépôt GitHub,
-et GitHub Pages se met à jour en 1 à 2 minutes.
+Les données sont partagées en ligne sur **jsonblob.com** (gratuit, sans compte ni clé).
+Quand un éditeur fait un changement, il est envoyé tout de suite, et les visiteurs le voient
+en moins de 20 secondes, sans recharger la page. Chaque navigateur garde aussi une copie.
 
-Il faut une fois par appareil une **clé GitHub** (*Réglages → Publier sur le site*, les étapes y sont) :
-un *fine-grained token* limité au dépôt **Ligue-golf** avec la permission **Contents : Read and write**.
-La clé reste dans le navigateur.
+**Mise en route (une seule fois)** : en mode édition, *Réglages → Partage en ligne → Activer*.
+Le site affiche un code : le mettre dans `CLOUD_ID` en haut de `app.js` pour que tous les visiteurs
+le trouvent. En attendant, partager le lien `…?ligue=CODE` affiché sous le code.
 
-En ouvrant le site, chaque navigateur prend la version la plus récente entre la sienne et celle du site.
+⚠️ jsonblob.com est un service gratuit sans garantie, et quelqu'un de débrouillard pourrait modifier
+les données. Exporter de temps en temps (*Réglages → Données → Exporter*) pour garder une copie.
 Avant de remplacer des données, une copie de sécurité est gardée (*Réglages → Données*).
 
 Après une modification de `app.js` ou `style.css`, augmenter le numéro `?v=` dans `index.html` pour que les navigateurs chargent la nouvelle version.
