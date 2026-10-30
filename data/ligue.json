@@ -79,6 +79,12 @@
       "name": "Georgia Golf Club",
       "par": 72,
       "holes": 18
+    },
+    {
+      "id": "bear-creek",
+      "name": "Bear Creek Golf Club",
+      "par": 72,
+      "holes": 18
     }
   ],
   "games": [
@@ -325,6 +331,46 @@
       "notes": "Scramble (GS Pro)."
     },
     {
+      "id": "g20261025",
+      "date": "2026-10-25",
+      "courseId": "bear-creek",
+      "holes": 18,
+      "par": 72,
+      "format": "individuel",
+      "teams": [
+        {
+          "players": [
+            "jay"
+          ],
+          "score": 107
+        },
+        {
+          "players": [
+            "charles"
+          ],
+          "score": 96
+        },
+        {
+          "players": [
+            "luc"
+          ],
+          "score": 90
+        }
+      ],
+      "stats": {
+        "jay": {
+          "birdies": 1
+        },
+        "charles": {
+          "birdies": 0
+        },
+        "luc": {
+          "birdies": 0
+        }
+      },
+      "notes": "Stroke play (GS Pro)."
+    },
+    {
       "id": "g20261029",
       "date": "2026-10-29",
       "courseId": "georgia",
@@ -351,5 +397,5 @@
       "notes": "Scramble (GS Pro)."
     }
   ],
-  "updatedAt": "2026-10-30T22:41:07.000Z"
+  "updatedAt": "2026-10-30T22:46:19.000Z"
 }
