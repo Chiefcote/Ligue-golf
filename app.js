@@ -3,6 +3,9 @@
 // exportées / importées en JSON. Au premier chargement, on lit data/ligue.json.
 
 const STORAGE_KEY = 'ligue-golf';
+const EDITOR_KEY = 'ligue-golf-editeur';
+// Empreinte SHA-256 du mot de passe par défaut (« golf2026 »). Se change dans Réglages.
+const DEFAULT_EDIT_HASH = 'c3d202d707368179b25dd25eead59c9dd6f45f55e65347c0e23485dfba34e403';
 const DEFAULT_SETTINGS = { participation: 1, parAdversaire: 1, bonusVictoire: 2 };
 const STAT_FIELDS = [
   { key: 'putts', label: 'Putts' },
@@ -15,6 +18,36 @@ const STAT_FIELDS = [
 let db = null;
 let currentTab = 'classement';
 let tabState = {}; // filtres, joueur sélectionné, partie en édition
+let editor = false; // false = lecture seule
+
+// ---------- Accès ----------
+// Lecture seule par défaut : on lit toujours data/ligue.json du site.
+// Le mode édition se débloque avec un mot de passe. Ce n'est pas une vraie sécurité
+// (le code est public) : ça empêche surtout les modifications par erreur.
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const editHash = () => db.settings.editHash || DEFAULT_EDIT_HASH;
+
+async function login() {
+  const pw = prompt('Mot de passe pour modifier :');
+  if (!pw) return;
+  if (await sha256(pw) !== editHash()) { alert('Mot de passe incorrect.'); return; }
+  editor = true;
+  try { localStorage.setItem(EDITOR_KEY, '1'); } catch (e) { /* ignore */ }
+  await load();
+  render();
+}
+
+async function logout() {
+  editor = false;
+  try { localStorage.removeItem(EDITOR_KEY); } catch (e) { /* ignore */ }
+  tabState.editing = null;
+  db = await fetchSiteData();
+  render();
+}
 
 // ---------- Données ----------
 
@@ -30,6 +63,7 @@ function normalize(d) {
 }
 
 async function load() {
+  if (!editor) { db = await fetchSiteData(); return; }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) { db = normalize(JSON.parse(raw)); return; }
@@ -46,6 +80,7 @@ async function fetchSiteData() {
 }
 
 function save() {
+  if (!editor) return;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
 }
 
@@ -161,6 +196,10 @@ const view = () => document.getElementById('view');
 function render() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === currentTab));
   const fn = { classement: renderStandings, parties: renderGames, joueurs: renderPlayers, terrains: renderCourses, reglages: renderSettings }[currentTab];
+  document.body.classList.toggle('editeur', editor);
+  const acc = document.getElementById('access');
+  acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
+  acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
   view().innerHTML = fn();
   bind();
 }
@@ -174,7 +213,7 @@ function renderStandings() {
   const games = filteredGames();
   const rows = standings(games);
   if (!rows.length) {
-    return `<div class="card empty">Aucune partie pour l'instant.<br><br><button class="primary" data-action="new-game">+ Ajouter une partie</button></div>`;
+    return `<div class="card empty">Aucune partie pour l'instant.<br><br><button class="primary edit-only" data-action="new-game">+ Ajouter une partie</button></div>`;
   }
   const best = b => (b ? `<span title="${esc(b.score)} — ${esc(fmtDate(b.game.date))}, ${esc(courseName(b.game.courseId))}">${fmtPar(b.vsPar)}</span>` : '—');
   const body = rows.map((r, i) => `
@@ -209,7 +248,7 @@ function renderStandings() {
       <p class="muted">PJ = parties jouées · V = victoires · Moy. solo = score moyen par rapport à la normale en « chacun pour soi » · Meill. = meilleur score par rapport à la normale.</p>
     </div>
     ${last ? `<h3>Dernière partie</h3>${gameCard(last)}` : ''}
-    <div class="row"><button class="primary" data-action="new-game">+ Ajouter une partie</button></div>`;
+    <div class="row edit-only"><button class="primary" data-action="new-game">+ Ajouter une partie</button></div>`;
 }
 
 function gameCard(g) {
@@ -231,7 +270,7 @@ function gameCard(g) {
       <div><b>${fmtDate(g.date)}</b> · ${esc(courseName(g.courseId))}
         <span class="pill">${g.format === 'individuel' ? 'Chacun pour soi' : 'Meilleure balle'}</span>
         <span class="muted">${g.holes} trous · normale ${g.par}</span></div>
-      <div class="row"><button class="small" data-action="edit-game" data-id="${g.id}">Modifier</button></div>
+      <div class="row edit-only"><button class="small" data-action="edit-game" data-id="${g.id}">Modifier</button></div>
     </div>
     <div class="scroll"><table><thead><tr><th>#</th><th>${g.format === 'individuel' ? 'Joueur' : 'Équipe'}</th><th class="num">Score</th><th class="num">Pts/joueur</th></tr></thead><tbody>${lines}</tbody></table></div>
     ${g.notes ? `<p class="muted">${esc(g.notes)}</p>` : ''}
@@ -242,7 +281,7 @@ function renderGames() {
   if (tabState.editing) return gameForm(tabState.editing);
   const games = filteredGames();
   return `
-    <div class="row between"><h2>Parties</h2><div class="row">${seasonSelect()}<button class="primary" data-action="new-game">+ Nouvelle partie</button></div></div>
+    <div class="row between"><h2>Parties</h2><div class="row">${seasonSelect()}<button class="primary edit-only" data-action="new-game">+ Nouvelle partie</button></div></div>
     ${games.length ? games.map(gameCard).join('') : '<div class="card empty">Aucune partie.</div>'}`;
 }
 
@@ -382,7 +421,7 @@ function renderPlayers() {
     detail = `
       <div class="card">
         <div class="row between"><h2 style="margin:0">${esc(p.name)}</h2>
-          <div class="row"><button class="small" data-action="rename-player" data-id="${p.id}">Renommer</button>
+          <div class="row edit-only"><button class="small" data-action="rename-player" data-id="${p.id}">Renommer</button>
           <button class="small danger" data-action="delete-player" data-id="${p.id}">Supprimer</button></div></div>
         <h3>Général</h3>
         <div class="stats">
@@ -419,7 +458,7 @@ function renderPlayers() {
   return `
     <div class="row between"><h2>Joueurs</h2>${seasonSelect()}</div>
     <div class="card"><div class="chips">${list || '<span class="muted">Aucun joueur.</span>'}</div>
-      <div class="row" style="margin-top:12px"><input id="new-player" placeholder="Nom du joueur" style="flex:1;width:auto"><button class="primary" data-action="add-player">Ajouter</button></div></div>
+      <div class="row edit-only" style="margin-top:12px"><input id="new-player" placeholder="Nom du joueur" style="flex:1;width:auto"><button class="primary" data-action="add-player">Ajouter</button></div></div>
     ${detail}`;
 }
 
@@ -435,14 +474,14 @@ function renderCourses() {
     }));
     return `<tr><td><b>${esc(c.name)}</b></td><td class="num">${c.par}</td><td class="num">${games.length}</td>
       <td>${record ? `${fmtPar(record.vs)} — ${esc(playerName(record.who))} <span class="muted">(${fmtDate(record.date)})</span>` : '—'}</td>
-      <td class="num"><button class="small" data-action="edit-course" data-id="${c.id}">Modifier</button></td></tr>`;
+      <td class="num edit-only"><button class="small" data-action="edit-course" data-id="${c.id}">Modifier</button></td></tr>`;
   }).join('');
   return `
     <h2>Terrains</h2>
     <div class="card scroll">
-      ${rows ? `<table><thead><tr><th>Terrain</th><th class="num">Normale</th><th class="num">Parties</th><th>Record (solo)</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">Aucun terrain.</p>'}
+      ${rows ? `<table><thead><tr><th>Terrain</th><th class="num">Normale</th><th class="num">Parties</th><th>Record (solo)</th><th class="edit-only"></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">Aucun terrain.</p>'}
     </div>
-    <div class="card">
+    <div class="card edit-only">
       <h3 style="margin-top:0">Ajouter un terrain</h3>
       <div class="row">
         <div class="field" style="flex:2"><label>Nom</label><input id="course-name" placeholder="ex. Pebble Beach"></div>
@@ -456,6 +495,7 @@ function renderCourses() {
 
 function renderSettings() {
   const s = db.settings;
+  const ro = editor ? '' : 'disabled';
   const ex = (n, sz = 1) => fmtNum(s.participation + s.parAdversaire * n * sz + s.bonusVictoire);
   return `
     <h2>Système de pointage</h2>
@@ -468,14 +508,15 @@ function renderSettings() {
         <li><b>Bonus victoire</b> : pour la 1re place (partagé en cas d'égalité).</li>
       </ul>
       <div class="row">
-        <div class="field"><label>Participation</label><input type="number" step="0.5" data-bind="setting" data-key="participation" value="${s.participation}"></div>
-        <div class="field"><label>Par adversaire battu</label><input type="number" step="0.5" data-bind="setting" data-key="parAdversaire" value="${s.parAdversaire}"></div>
-        <div class="field"><label>Bonus victoire</label><input type="number" step="0.5" data-bind="setting" data-key="bonusVictoire" value="${s.bonusVictoire}"></div>
+        <div class="field"><label>Participation</label><input type="number" step="0.5" data-bind="setting" data-key="participation" value="${s.participation}" ${ro}></div>
+        <div class="field"><label>Par adversaire battu</label><input type="number" step="0.5" data-bind="setting" data-key="parAdversaire" value="${s.parAdversaire}" ${ro}></div>
+        <div class="field"><label>Bonus victoire</label><input type="number" step="0.5" data-bind="setting" data-key="bonusVictoire" value="${s.bonusVictoire}" ${ro}></div>
       </div>
       <p class="muted">Exemples avec ces réglages : gagner en meilleure balle 2 contre 2 = <b>${ex(2)}</b> pts chacun ·
         gagner en solo contre 3 joueurs = <b>${ex(3)}</b> pts · gagner en solo contre 5 joueurs = <b>${ex(5)}</b> pts ·
         finir dernier = <b>${fmtNum(s.participation)}</b> pt. Le classement est recalculé automatiquement si tu changes ces valeurs.</p>
     </div>
+    <div class="edit-only">
     <h2>Données</h2>
     <div class="card">
       <p class="muted">Les données sont sauvegardées dans ce navigateur. Pour les partager avec la gang, exporte le fichier
@@ -485,6 +526,13 @@ function renderSettings() {
         <label class="btn" style="margin:0;color:var(--text);font-size:1rem">⬆️ Importer<input type="file" accept=".json" data-action="import" hidden></label>
         <button data-action="reload-site">🔄 Recharger la version du site</button>
       </div>
+    </div>
+    <h2>Accès</h2>
+    <div class="card">
+      <p class="muted">Sans mot de passe, le site est en lecture seule. Après un changement de mot de passe,
+        exporte le fichier et remplace <code>data/ligue.json</code> pour qu'il s'applique à tout le monde.</p>
+      <div class="row"><button data-action="change-password">🔑 Changer le mot de passe</button></div>
+    </div>
     </div>`;
 }
 
@@ -493,14 +541,20 @@ function renderSettings() {
 function bind() {
   view().querySelectorAll('[data-action]').forEach(el => {
     const evt = el.tagName === 'SELECT' || el.type === 'file' ? 'change' : 'click';
-    el.addEventListener(evt, e => actions[el.dataset.action]?.(el, e));
+    el.addEventListener(evt, e => {
+      if (!editor && EDIT_ACTIONS.has(el.dataset.action)) return;
+      actions[el.dataset.action]?.(el, e);
+    });
   });
   view().querySelectorAll('[data-bind]').forEach(el => {
-    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => binds[el.dataset.bind]?.(el));
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { if (editor) binds[el.dataset.bind]?.(el); });
   });
 }
 
 const draft = () => tabState.editing;
+
+const EDIT_ACTIONS = new Set(['new-game', 'edit-game', 'save-game', 'delete-game', 'add-player', 'add-player-inline',
+  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password']);
 
 const binds = {
   date: el => { draft().date = el.value; },
@@ -613,6 +667,13 @@ const actions = {
       } catch (e) { alert('Fichier invalide.'); }
     });
   },
+  'change-password': async () => {
+    const a = prompt('Nouveau mot de passe :');
+    if (!a) return;
+    if (prompt('Confirme le nouveau mot de passe :') !== a) { alert('Les deux mots de passe ne sont pas pareils.'); return; }
+    db.settings.editHash = await sha256(a); save();
+    alert('Mot de passe changé dans ce navigateur. Exporte et remplace data/ligue.json pour l\'appliquer au site.');
+  },
   'reload-site': async () => {
     if (!confirm('Remplacer les données de ce navigateur par celles du fichier data/ligue.json du site ?')) return;
     db = await fetchSiteData(); save(); render();
@@ -622,8 +683,11 @@ const actions = {
 document.getElementById('tabs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   currentTab = b.dataset.tab;
-  if (currentTab !== 'parties') tabState.editing = null;
+  if (currentTab !== 'parties' || !editor) tabState.editing = null;
   render();
 });
 
+document.getElementById('access').addEventListener('click', () => (editor ? logout() : login()));
+
+try { editor = localStorage.getItem(EDITOR_KEY) === '1'; } catch (e) { /* ignore */ }
 load().then(render);

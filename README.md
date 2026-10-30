@@ -32,6 +32,19 @@ Le classement est toujours recalculé à partir des parties, donc changer les r�
 
 Dans le dépôt GitHub : *Settings → Pages → Branch* : choisir la branche et le dossier `/ (root)`.
 
+## Accès : lecture seule ou modification
+
+Par défaut, le site est en **lecture seule** : tout le monde voit le classement, les parties, les joueurs
+et les terrains (lus dans `data/ligue.json`), sans pouvoir rien changer.
+
+Pour modifier, toucher **🔒 Lecture seule** en haut à droite et entrer le mot de passe
+(par défaut : `golf2026`). Le navigateur reste en mode édition jusqu'à ce qu'on touche **🔓 Mode édition**.
+Le mot de passe se change dans *Réglages → Accès* (puis exporter et remplacer `data/ligue.json`).
+
+⚠️ Ce mot de passe empêche les modifications par erreur, mais ce n'est pas une vraie sécurité :
+le site n'a pas de serveur. Les vraies données partagées ne changent que lorsqu'on remplace
+`data/ligue.json` dans le dépôt GitHub, ce qui demande un accès au dépôt.
+
 ## Où sont les données ?
 
 Les parties entrées sont sauvegardées dans le navigateur. Pour que tout le monde voie la même chose :

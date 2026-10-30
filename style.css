@@ -93,3 +93,6 @@ details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
 .standings th, .standings td { white-space: nowrap; }
 .standings .grp { border-left: 1px solid var(--line); padding-left: 10px; }
 .standings tr.groups th { text-align: center; border-bottom: 0; padding-bottom: 0; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding-right: 16px; }
+body:not(.editeur) .edit-only { display: none !important; }
+#access { white-space: nowrap; }
