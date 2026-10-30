@@ -1,10 +1,13 @@
 // Ligue de golf — tout fonctionne dans le navigateur.
-// Les données sont gardées dans le navigateur (localStorage) et peuvent être
-// exportées / importées en JSON. Au premier chargement, on lit data/ligue.json.
+// Les données sont gardées dans le navigateur (localStorage). Le bouton « Publier »
+// les écrit dans data/ligue.json sur GitHub pour que tout le monde les voie.
 
 const STORAGE_KEY = 'ligue-golf';
 const EDITOR_KEY = 'ligue-golf-editeur';
 const BACKUP_KEY = 'ligue-golf-copie';
+const TOKEN_KEY = 'ligue-golf-cle-github';
+// Où publier les données (le dépôt et la branche que GitHub Pages affiche).
+const GITHUB = { repo: 'Chiefcote/Ligue-golf', branch: 'claude/golf-league-stats-site-yvp77s', path: 'data/ligue.json' };
 // Empreinte SHA-256 du mot de passe par défaut (« golf2026 »). Se change dans Réglages.
 const DEFAULT_EDIT_HASH = 'c3d202d707368179b25dd25eead59c9dd6f45f55e65347c0e23485dfba34e403';
 const DEFAULT_SETTINGS = { participation: 1, parAdversaire: 1, bonusVictoire: 2 };
@@ -61,17 +64,23 @@ function normalize(d) {
   return out;
 }
 
+// On prend la version la plus récente entre ce navigateur et le site.
 async function load() {
+  let local = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { db = normalize(JSON.parse(raw)); return; }
+    if (raw) local = normalize(JSON.parse(raw));
   } catch (e) { /* stockage indisponible */ }
-  db = await fetchSiteData();
+  const site = await fetchSiteData();
+  if (local && (local.updatedAt || '') >= (site.updatedAt || '')) { db = local; return; }
+  if (local && local.games.length) { db = local; backup('Version plus récente du site chargée.'); tabState.undo = null; }
+  db = site;
+  if (local) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ } }
 }
 
 async function fetchSiteData() {
   try {
-    const res = await fetch('data/ligue.json', { cache: 'no-store' });
+    const res = await fetch('data/ligue.json?t=' + Date.now(), { cache: 'no-store' });
     if (res.ok) return normalize(await res.json());
   } catch (e) { /* fichier absent (ouvert en local) */ }
   return emptyDb();
@@ -79,7 +88,80 @@ async function fetchSiteData() {
 
 function save() {
   if (!editor) return;
+  db.updatedAt = new Date().toISOString();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
+}
+
+// ----- Publier sur le site (GitHub) -----
+// Écrit data/ligue.json dans le dépôt avec une clé GitHub gardée dans ce navigateur.
+// GitHub Pages met ensuite le site à jour (environ 1 minute).
+
+const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } };
+const unpublished = () => editor && (db.updatedAt || '') > (db.publishedAt || '') ||
+  editor && !db.publishedAt && db.games.length > 0;
+
+function toBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+function fromBase64(b64) {
+  const bin = atob(b64.replace(/\s/g, ''));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+
+async function publish() {
+  const token = getToken();
+  if (!token) {
+    alert('Il faut d\'abord ajouter ta clé GitHub dans Réglages → Publier sur le site.');
+    currentTab = 'reglages'; render(); return;
+  }
+  const url = `https://api.github.com/repos/${GITHUB.repo}/contents/${GITHUB.path}`;
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
+  tabState.publishing = true; render();
+  try {
+    const cur = await fetch(`${url}?ref=${encodeURIComponent(GITHUB.branch)}&t=${Date.now()}`, { headers, cache: 'no-store' });
+    if (cur.status === 401) throw new Error('Clé GitHub invalide ou expirée.');
+    if (!cur.ok && cur.status !== 404) throw new Error(`GitHub a refusé la lecture (erreur ${cur.status}).`);
+    const curJson = cur.ok ? await cur.json() : null;
+    // Quelqu'un d'autre a-t-il publié depuis ma dernière publication ?
+    if (curJson?.content) {
+      let remote = null; try { remote = JSON.parse(fromBase64(curJson.content)); } catch (e) { /* ignore */ }
+      if (remote?.publishedAt && remote.publishedAt > (db.publishedAt || '') && db.publishedAt) {
+        const ok = confirm(`⚠️ Quelqu'un d'autre a publié depuis ta dernière publication (${nbParties(remote.games?.length || 0)} sur le site, ${nbParties(db.games.length)} ici).\n\nPublier quand même remplacera sa version. Continuer ?`);
+        if (!ok) return;
+      }
+    }
+    const now = new Date().toISOString();
+    const data = { ...db, updatedAt: now, publishedAt: now };
+    const res = await fetch(url, {
+      method: 'PUT', headers,
+      body: JSON.stringify({
+        message: `Mise à jour des parties (${nbParties(data.games.length)})`,
+        content: toBase64(JSON.stringify(data, null, 2) + '\n'),
+        branch: GITHUB.branch,
+        ...(curJson?.sha ? { sha: curJson.sha } : {}),
+      }),
+    });
+    if (res.status === 401) throw new Error('Clé GitHub invalide ou expirée.');
+    if (res.status === 403 || res.status === 404) throw new Error('Cette clé GitHub n\'a pas le droit d\'écrire dans le dépôt (il faut « Contents : Read and write »).');
+    if (res.status === 409) throw new Error('Le fichier a changé pendant la publication. Réessaie.');
+    if (!res.ok) throw new Error(`GitHub a refusé la publication (erreur ${res.status}).`);
+    db = data;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
+    tabState.undo = null;
+    alert('✅ Publié ! Le site sera à jour pour tout le monde d\'ici 1 à 2 minutes.');
+  } catch (e) {
+    alert('❌ Publication impossible : ' + (e.message || 'problème de connexion.'));
+  } finally {
+    tabState.publishing = false; render();
+  }
+}
+
+function publishBanner() {
+  if (!unpublished()) return '';
+  return `<div class="card notice row between"><span>📝 Tu as des changements qui ne sont pas encore sur le site.</span>
+    <button class="primary small" data-action="publish" ${tabState.publishing ? 'disabled' : ''}>${tabState.publishing ? 'Publication…' : '📤 Publier'}</button></div>`;
 }
 
 // ----- Copie de sécurité -----
@@ -227,7 +309,7 @@ function render() {
   const acc = document.getElementById('access');
   acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
   acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
-  view().innerHTML = undoBanner() + fn();
+  view().innerHTML = undoBanner() + (tabState.editing ? '' : publishBanner()) + fn();
   bind();
 }
 
@@ -559,6 +641,26 @@ function renderSettings() {
           <button data-action="restore-backup">↩️ Restaurer la copie de sécurité</button>` : '';
       })()}
     </div>
+    <h2>Publier sur le site</h2>
+    <div class="card">
+      <p>Le bouton <b>📤 Publier</b> envoie les parties de ce navigateur sur le site, pour que tout le monde les voie.
+        Il faut une clé GitHub (une seule fois par appareil) :</p>
+      <ol class="muted">
+        <li>Ouvre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Fine-grained token</a>.</li>
+        <li>Nom : « Ligue golf ». Expiration : au choix (ex. 1 an).</li>
+        <li><i>Repository access</i> → <i>Only select repositories</i> → <b>Ligue-golf</b>.</li>
+        <li><i>Permissions</i> → <i>Repository permissions</i> → <b>Contents : Read and write</b>.</li>
+        <li><i>Generate token</i>, copie la clé et colle-la ici.</li>
+      </ol>
+      <div class="row">
+        <input id="gh-token" type="password" placeholder="${getToken() ? 'Clé enregistrée ✓ (coller pour remplacer)' : 'github_pat_…'}" style="flex:1;width:auto" autocomplete="off">
+        <button data-action="save-token">Enregistrer la clé</button>
+        ${getToken() ? '<button class="danger" data-action="forget-token">Oublier</button>' : ''}
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-action="publish">📤 Publier maintenant</button>
+        <span class="muted">${db.publishedAt ? 'Dernière publication : ' + new Date(db.publishedAt).toLocaleString('fr-CA') : 'Jamais publié depuis ce navigateur.'}</span></div>
+      <p class="muted">La clé reste seulement dans ce navigateur. Ne la partage pas : elle permet de modifier le dépôt.</p>
+    </div>
     <h2>Accès</h2>
     <div class="card">
       <p class="muted">Sans mot de passe, le site est en lecture seule. Après un changement de mot de passe,
@@ -586,7 +688,8 @@ function bind() {
 const draft = () => tabState.editing;
 
 const EDIT_ACTIONS = new Set(['new-game', 'edit-game', 'save-game', 'delete-game', 'add-player', 'add-player-inline',
-  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password', 'undo', 'restore-backup']);
+  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password', 'undo', 'restore-backup',
+  'publish', 'save-token', 'forget-token']);
 
 const binds = {
   date: el => { draft().date = el.value; },
@@ -718,6 +821,18 @@ const actions = {
     db = site; save(); render();
   },
   undo: () => restoreBackup(),
+  publish: () => { if (!tabState.publishing) publish(); },
+  'save-token': () => {
+    const v = document.getElementById('gh-token').value.trim();
+    if (!v) return;
+    try { localStorage.setItem(TOKEN_KEY, v); } catch (e) { /* ignore */ }
+    alert('Clé enregistrée dans ce navigateur.'); render();
+  },
+  'forget-token': () => {
+    if (!confirm('Oublier la clé GitHub de ce navigateur ?')) return;
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+    render();
+  },
   'dismiss-undo': () => { tabState.undo = null; render(); },
   'restore-backup': () => {
     const b = getBackup(); if (!b) return;

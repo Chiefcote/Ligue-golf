@@ -45,11 +45,18 @@ Le mot de passe se change dans *Réglages → Accès* (puis exporter et remplace
 le site n'a pas de serveur. Les vraies données partagées ne changent que lorsqu'on remplace
 `data/ligue.json` dans le dépôt GitHub, ce qui demande un accès au dépôt.
 
-## Où sont les données ?
+## Où sont les données ? Comment les publier ?
 
-Les parties entrées sont sauvegardées dans le navigateur. Pour que tout le monde voie la même chose :
-*Réglages → Exporter*, puis remplacer `data/ligue.json` dans le dépôt par le fichier exporté.
-Le bouton *Recharger la version du site* récupère ce fichier.
+Les parties entrées sont d'abord sauvegardées dans le navigateur. Pour que tout le monde les voie,
+toucher **📤 Publier** (en mode édition) : le site écrit `data/ligue.json` dans le dépôt GitHub,
+et GitHub Pages se met à jour en 1 à 2 minutes.
+
+Il faut une fois par appareil une **clé GitHub** (*Réglages → Publier sur le site*, les étapes y sont) :
+un *fine-grained token* limité au dépôt **Ligue-golf** avec la permission **Contents : Read and write**.
+La clé reste dans le navigateur.
+
+En ouvrant le site, chaque navigateur prend la version la plus récente entre la sienne et celle du site.
+Avant de remplacer des données, une copie de sécurité est gardée (*Réglages → Données*).
 
 Après une modification de `app.js` ou `style.css`, augmenter le numéro `?v=` dans `index.html` pour que les navigateurs chargent la nouvelle version.
 
