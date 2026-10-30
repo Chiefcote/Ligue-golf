@@ -4,6 +4,7 @@
 
 const STORAGE_KEY = 'ligue-golf';
 const EDITOR_KEY = 'ligue-golf-editeur';
+const BACKUP_KEY = 'ligue-golf-copie';
 // Empreinte SHA-256 du mot de passe par défaut (« golf2026 »). Se change dans Réglages.
 const DEFAULT_EDIT_HASH = 'c3d202d707368179b25dd25eead59c9dd6f45f55e65347c0e23485dfba34e403';
 const DEFAULT_SETTINGS = { participation: 1, parAdversaire: 1, bonusVictoire: 2 };
@@ -81,6 +82,35 @@ function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
 }
 
+// ----- Copie de sécurité -----
+// Avant toute action qui efface ou remplace des données, on garde l'état précédent.
+
+function backup(label) {
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ label, at: new Date().toISOString(), db })); } catch (e) { /* ignore */ }
+  tabState.undo = label;
+}
+
+function getBackup() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch (e) { return null; }
+}
+
+function restoreBackup() {
+  const b = getBackup(); if (!b) return;
+  const current = db;
+  db = normalize(b.db); save();
+  // On garde ce qu'on vient de remplacer, pour pouvoir revenir en arrière une 2e fois.
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ label: 'Annulation', at: new Date().toISOString(), db: current })); } catch (e) { /* ignore */ }
+  tabState.undo = null; tabState.editing = null;
+  render();
+}
+
+function undoBanner() {
+  if (!editor || !tabState.undo) return '';
+  return `<div class="card notice row between"><span>✅ ${esc(tabState.undo)}</span>
+    <div class="row"><button class="small" data-action="undo">↩️ Annuler</button><button class="small" data-action="dismiss-undo">OK</button></div></div>`;
+}
+
+const nbParties = n => `${n} partie${n > 1 ? 's' : ''}`;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const byId = (list, id) => list.find(x => x.id === id);
 const playerName = id => byId(db.players, id)?.name ?? '(joueur supprimé)';
@@ -197,7 +227,7 @@ function render() {
   const acc = document.getElementById('access');
   acc.textContent = editor ? '🔓 Mode édition' : '🔒 Lecture seule';
   acc.title = editor ? 'Toucher pour revenir en lecture seule' : 'Toucher pour entrer le mot de passe';
-  view().innerHTML = fn();
+  view().innerHTML = undoBanner() + fn();
   bind();
 }
 
@@ -523,6 +553,11 @@ function renderSettings() {
         <label class="btn" style="margin:0;color:var(--text);font-size:1rem">⬆️ Importer<input type="file" accept=".json" data-action="import" hidden></label>
         <button data-action="reload-site">🔄 Recharger la version du site</button>
       </div>
+      ${(() => {
+        const b = getBackup();
+        return b ? `<p class="muted">Copie de sécurité : ${esc(b.label)} — ${new Date(b.at).toLocaleString('fr-CA')} (${nbParties(b.db.games?.length || 0)}).</p>
+          <button data-action="restore-backup">↩️ Restaurer la copie de sécurité</button>` : '';
+      })()}
     </div>
     <h2>Accès</h2>
     <div class="card">
@@ -551,7 +586,7 @@ function bind() {
 const draft = () => tabState.editing;
 
 const EDIT_ACTIONS = new Set(['new-game', 'edit-game', 'save-game', 'delete-game', 'add-player', 'add-player-inline',
-  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password']);
+  'rename-player', 'delete-player', 'add-course', 'edit-course', 'export', 'import', 'reload-site', 'change-password', 'undo', 'restore-backup']);
 
 const binds = {
   date: el => { draft().date = el.value; },
@@ -618,6 +653,7 @@ const actions = {
   },
   'delete-game': () => {
     if (!confirm('Supprimer cette partie ?')) return;
+    backup('Partie supprimée.');
     db.games = db.games.filter(g => g.id !== draft().id); save(); tabState.editing = null; render();
   },
   'open-player': el => { currentTab = 'joueurs'; tabState.player = el.dataset.id; render(); },
@@ -634,6 +670,7 @@ const actions = {
     const used = db.games.some(g => g.teams.some(t => t.players.includes(el.dataset.id)));
     if (used) { alert('Ce joueur a des parties enregistrées. Supprime ou modifie ces parties d\'abord.'); return; }
     if (!confirm('Supprimer ce joueur ?')) return;
+    backup('Joueur supprimé.');
     db.players = db.players.filter(p => p.id !== el.dataset.id); save(); tabState.player = null; render();
   },
   'add-course': () => {
@@ -660,6 +697,7 @@ const actions = {
       try {
         const data = normalize(JSON.parse(t));
         if (!confirm(`Remplacer les données actuelles par ce fichier (${data.games.length} parties, ${data.players.length} joueurs) ?`)) return;
+        backup('Données importées.');
         db = data; save(); render();
       } catch (e) { alert('Fichier invalide.'); }
     });
@@ -672,8 +710,19 @@ const actions = {
     alert('Mot de passe changé dans ce navigateur. Exporte et remplace data/ligue.json pour l\'appliquer au site.');
   },
   'reload-site': async () => {
-    if (!confirm('Remplacer les données de ce navigateur par celles du fichier data/ligue.json du site ?')) return;
-    db = await fetchSiteData(); save(); render();
+    const site = await fetchSiteData();
+    let msg = `Remplacer les données de ce navigateur (${nbParties(db.games.length)}) par celles du site (${nbParties(site.games.length)}) ?`;
+    if (site.games.length < db.games.length) msg = `⚠️ Attention : le site contient MOINS de parties (${site.games.length}) que ce navigateur (${db.games.length}).\n\n` + msg;
+    if (!confirm(msg)) return;
+    backup('Données remplacées par celles du site.');
+    db = site; save(); render();
+  },
+  undo: () => restoreBackup(),
+  'dismiss-undo': () => { tabState.undo = null; render(); },
+  'restore-backup': () => {
+    const b = getBackup(); if (!b) return;
+    if (!confirm(`Restaurer la copie de sécurité du ${new Date(b.at).toLocaleString('fr-CA')} (${nbParties(b.db.games?.length || 0)}) ?`)) return;
+    restoreBackup();
   },
 };
 

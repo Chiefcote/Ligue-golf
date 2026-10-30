@@ -96,3 +96,4 @@ details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
 .topbar { display: flex; justify-content: space-between; align-items: center; padding-right: 16px; }
 body:not(.editeur) .edit-only { display: none !important; }
 #access { white-space: nowrap; }
+.notice { border-color: var(--gold); }
