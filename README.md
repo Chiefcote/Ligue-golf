@@ -39,24 +39,19 @@ sans pouvoir rien changer.
 
 Pour modifier, toucher **🔒 Lecture seule** en haut à droite et entrer le mot de passe
 (par défaut : `golf2026`). Le navigateur reste en mode édition jusqu'à ce qu'on touche **🔓 Mode édition**.
-Le mot de passe se change dans *Réglages → Accès*.
+Pour changer le mot de passe pour tout le monde, changer `DEFAULT_EDIT_HASH` dans `app.js` (empreinte SHA-256).
 
 ⚠️ Ce mot de passe empêche les modifications par erreur, mais ce n'est pas une vraie sécurité :
 le site n'a pas de serveur. Ça empêche les modifications par erreur, pas un pirate.
 
 ## Où sont les données ?
 
-Les données sont partagées en ligne sur **jsonblob.com** (gratuit, sans compte ni clé).
-Quand un éditeur fait un changement, il est envoyé tout de suite, et les visiteurs le voient
-en moins de 20 secondes, sans recharger la page. Chaque navigateur garde aussi une copie.
+Les parties officielles sont dans `data/ligue.json`. Après chaque soirée, envoyer la photo de la carte
+GS Pro à Claude, qui ajoute la partie au fichier : tout le monde la voit en quelques minutes.
 
-**Mise en route (une seule fois)** : en mode édition, *Réglages → Partage en ligne → Activer*.
-Le site affiche un code : le mettre dans `CLOUD_ID` en haut de `app.js` pour que tous les visiteurs
-le trouvent. En attendant, partager le lien `…?ligue=CODE` affiché sous le code.
-
-⚠️ jsonblob.com est un service gratuit sans garantie, et quelqu'un de débrouillard pourrait modifier
-les données. Exporter de temps en temps (*Réglages → Données → Exporter*) pour garder une copie.
-Avant de remplacer des données, une copie de sécurité est gardée (*Réglages → Données*).
+Les changements faits en mode édition restent seulement dans le navigateur où ils ont été faits.
+À l'ouverture, chaque navigateur prend la version la plus récente entre la sienne et celle du site,
+et garde une copie de sécurité avant de remplacer quoi que ce soit (*Réglages → Données*).
 
 Après une modification de `app.js` ou `style.css`, augmenter le numéro `?v=` dans `index.html` pour que les navigateurs chargent la nouvelle version.
 

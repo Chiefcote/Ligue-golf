@@ -97,5 +97,3 @@ details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
 body:not(.editeur) .edit-only { display: none !important; }
 #access { white-space: nowrap; }
 .notice { border-color: var(--gold); }
-.sync { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 6px; white-space: nowrap; }
-.sync:empty { display: none; }
