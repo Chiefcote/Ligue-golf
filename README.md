@@ -51,4 +51,6 @@ Les parties entrées sont sauvegardées dans le navigateur. Pour que tout le mon
 *Réglages → Exporter*, puis remplacer `data/ligue.json` dans le dépôt par le fichier exporté.
 Le bouton *Recharger la version du site* récupère ce fichier.
 
+Après une modification de `app.js` ou `style.css`, augmenter le numéro `?v=` dans `index.html` pour que les navigateurs chargent la nouvelle version.
+
 Pour tester en local : `python3 -m http.server` puis ouvrir http://localhost:8000.

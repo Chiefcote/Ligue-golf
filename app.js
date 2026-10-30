@@ -687,6 +687,12 @@ document.getElementById('tabs').addEventListener('click', e => {
   render();
 });
 
+// Bouton d'accès : on le crée s'il manque (ex. vieille page index.html gardée en cache).
+if (!document.getElementById('access')) {
+  const btn = document.createElement('button');
+  btn.id = 'access'; btn.className = 'small';
+  document.querySelector('header').prepend(btn);
+}
 document.getElementById('access').addEventListener('click', () => (editor ? logout() : login()));
 
 try { editor = localStorage.getItem(EDITOR_KEY) === '1'; } catch (e) { /* ignore */ }
