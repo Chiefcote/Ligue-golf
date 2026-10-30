@@ -1,7 +1,309 @@
 {
   "version": 1,
-  "settings": { "participation": 1, "parAdversaire": 1, "bonusVictoire": 2 },
-  "players": [],
-  "courses": [],
-  "games": []
+  "settings": {
+    "participation": 1,
+    "parAdversaire": 1,
+    "bonusVictoire": 2
+  },
+  "players": [
+    {
+      "id": "luc",
+      "name": "Luc"
+    },
+    {
+      "id": "jay",
+      "name": "Jay"
+    },
+    {
+      "id": "charles",
+      "name": "Charles"
+    },
+    {
+      "id": "duss",
+      "name": "Duss"
+    },
+    {
+      "id": "maxo",
+      "name": "Maxo"
+    },
+    {
+      "id": "berr",
+      "name": "Berr"
+    }
+  ],
+  "courses": [
+    {
+      "id": "sainte-marie",
+      "name": "Club de golf Sainte-Marie",
+      "par": 72,
+      "holes": 18
+    },
+    {
+      "id": "cda",
+      "name": "CDA National Reserve",
+      "par": 72,
+      "holes": 18
+    },
+    {
+      "id": "wynn",
+      "name": "Wynn Golf Club",
+      "par": 70,
+      "holes": 18
+    },
+    {
+      "id": "rumbling",
+      "name": "Rumbling Bald on Lake Lure – Apple Valley",
+      "par": 72,
+      "holes": 18
+    },
+    {
+      "id": "cabot",
+      "name": "Cabot Cliffs",
+      "par": 72,
+      "holes": 18
+    },
+    {
+      "id": "paynes",
+      "name": "Paynes Valley",
+      "par": 72,
+      "holes": 18
+    },
+    {
+      "id": "georgia",
+      "name": "Georgia Golf Club",
+      "par": 72,
+      "holes": 18
+    }
+  ],
+  "games": [
+    {
+      "id": "g20260903",
+      "date": "2026-09-03",
+      "courseId": "sainte-marie",
+      "holes": 18,
+      "par": 72,
+      "format": "individuel",
+      "teams": [
+        {
+          "players": [
+            "luc"
+          ],
+          "score": 99
+        },
+        {
+          "players": [
+            "jay"
+          ],
+          "score": 91
+        },
+        {
+          "players": [
+            "charles"
+          ],
+          "score": 84
+        },
+        {
+          "players": [
+            "duss"
+          ],
+          "score": 104
+        }
+      ],
+      "stats": {
+        "luc": {
+          "birdies": 0
+        },
+        "jay": {
+          "birdies": 0
+        },
+        "charles": {
+          "birdies": 0
+        },
+        "duss": {
+          "birdies": 1
+        }
+      },
+      "notes": "Stroke play (GS Pro)."
+    },
+    {
+      "id": "g20260910",
+      "date": "2026-09-10",
+      "courseId": "cda",
+      "holes": 18,
+      "par": 72,
+      "format": "individuel",
+      "teams": [
+        {
+          "players": [
+            "charles"
+          ],
+          "score": 99
+        },
+        {
+          "players": [
+            "jay"
+          ],
+          "score": 96
+        },
+        {
+          "players": [
+            "luc"
+          ],
+          "score": 99
+        },
+        {
+          "players": [
+            "duss"
+          ],
+          "score": 120
+        }
+      ],
+      "stats": {
+        "charles": {
+          "birdies": 0
+        },
+        "jay": {
+          "birdies": 0
+        },
+        "luc": {
+          "birdies": 1
+        },
+        "duss": {
+          "birdies": 0
+        }
+      },
+      "notes": "Stroke play (GS Pro)."
+    },
+    {
+      "id": "g20260917",
+      "date": "2026-09-17",
+      "courseId": "wynn",
+      "holes": 18,
+      "par": 70,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "charles",
+            "jay"
+          ],
+          "score": 76
+        },
+        {
+          "players": [
+            "duss",
+            "luc"
+          ],
+          "score": 77
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
+    },
+    {
+      "id": "g20261001",
+      "date": "2026-10-01",
+      "courseId": "rumbling",
+      "holes": 18,
+      "par": 72,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "jay",
+            "charles"
+          ],
+          "score": 75
+        },
+        {
+          "players": [
+            "luc",
+            "maxo"
+          ],
+          "score": 81
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
+    },
+    {
+      "id": "g20261008",
+      "date": "2026-10-08",
+      "courseId": "cabot",
+      "holes": 18,
+      "par": 72,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "charles",
+            "jay"
+          ],
+          "score": 74
+        },
+        {
+          "players": [
+            "duss",
+            "luc"
+          ],
+          "score": 82
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
+    },
+    {
+      "id": "g20261022",
+      "date": "2026-10-22",
+      "courseId": "paynes",
+      "holes": 18,
+      "par": 72,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "charles",
+            "luc"
+          ],
+          "score": 73
+        },
+        {
+          "players": [
+            "jay",
+            "duss"
+          ],
+          "score": 73
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
+    },
+    {
+      "id": "g20261029",
+      "date": "2026-10-29",
+      "courseId": "georgia",
+      "holes": 18,
+      "par": 72,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "jay",
+            "berr"
+          ],
+          "score": 76
+        },
+        {
+          "players": [
+            "charles",
+            "duss"
+          ],
+          "score": 78
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
+    }
+  ],
+  "updatedAt": "2026-10-30T22:38:21.000Z"
 }

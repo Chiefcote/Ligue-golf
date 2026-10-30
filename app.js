@@ -135,13 +135,22 @@ async function load() {
       if (editor && local && local.updatedAt && local.updatedAt !== local.syncedAt && local.updatedAt > (cloud.updatedAt || '')) {
         db = local; schedulePush(); return;
       }
+      // Espace en ligne encore vide alors que le fichier du site contient des parties : on part du fichier.
+      if (!cloud.games.length) {
+        const site = await fetchSiteData();
+        if (site.games.length) { db = site; cacheLocal(); if (editor) schedulePush(); return; }
+      }
       if (local && local.games.length > cloud.games.length) { db = local; backup('Version en ligne chargée.'); tabState.undo = null; }
       db = cloud; db.syncedAt = db.updatedAt; cacheLocal();
       sync = { state: 'ok', at: new Date() };
       return;
     } catch (e) { sync.state = 'horsligne'; }
   }
-  db = local || await fetchSiteData();
+  // Sans partage en ligne : la version la plus récente entre ce navigateur et le fichier du site.
+  const site = await fetchSiteData();
+  if (local && local.games.length && (local.updatedAt || '') >= (site.updatedAt || '')) { db = local; return; }
+  if (local && local.games.length) { db = local; backup('Version plus récente du site chargée.'); tabState.undo = null; }
+  db = site;
 }
 
 // Vérifie régulièrement s'il y a du nouveau (pour les visiteurs et les autres éditeurs).
@@ -421,7 +430,7 @@ function gameCard(g) {
   return `<div class="card">
     <div class="row between">
       <div><b>${fmtDate(g.date)}</b> · ${esc(courseName(g.courseId))}
-        <span class="pill">${g.format === 'individuel' ? 'Chacun pour soi' : 'Meilleure balle'}</span>
+        <span class="pill">${g.format === 'individuel' ? 'Chacun pour soi' : 'Équipe'}</span>
         <span class="muted">${g.holes} trous · normale ${g.par}</span></div>
       <div class="row edit-only"><button class="small" data-action="edit-game" data-id="${g.id}">Modifier</button></div>
     </div>
@@ -508,7 +517,7 @@ function gameForm(d) {
       </div>
       <label>Formule</label>
       <div class="seg" style="margin-bottom:12px">
-        <button type="button" class="${d.format === 'equipe' ? 'on' : ''}" data-action="format" data-f="equipe">2 balles meilleure balle</button>
+        <button type="button" class="${d.format === 'equipe' ? 'on' : ''}" data-action="format" data-f="equipe">En équipe (meilleure balle / scramble)</button>
         <button type="button" class="${d.format === 'individuel' ? 'on' : ''}" data-action="format" data-f="individuel">Chacun pour soi</button>
       </div>
       <label>Joueurs présents</label>
@@ -590,7 +599,7 @@ function renderPlayers() {
           <div class="stat"><b>${fmtPar(s.avgVsPar)}</b><span>Moyenne vs normale</span></div>
           <div class="stat"><b>${s.solo.best ? fmtPar(s.solo.best.vsPar) : '—'}</b><span>Meilleure ronde${s.solo.best ? ` (${s.solo.best.score}, ${esc(courseName(s.solo.best.game.courseId))})` : ''}</span></div>
         </div>
-        <h3>Meilleure balle</h3>
+        <h3>En équipe</h3>
         <div class="stats">
           <div class="stat"><b>${s.team.games}</b><span>Parties</span></div>
           <div class="stat"><b>${s.team.wins}–${s.team.losses}</b><span>Victoires–défaites</span></div>
@@ -657,7 +666,7 @@ function renderSettings() {
       <ul>
         <li><b>Participation</b> : des points juste pour être venu.</li>
         <li><b>Par adversaire battu</b> : des points pour chaque <i>joueur</i> adverse qui a fait un pire score que toi (égalité = moitié).
-          En meilleure balle, battre une équipe de 2 compte pour 2 adversaires — pour chacun des 2 coéquipiers.</li>
+          En équipe, battre une équipe de 2 compte pour 2 adversaires — pour chacun des 2 coéquipiers.</li>
         <li><b>Bonus victoire</b> : pour la 1re place (partagé en cas d'égalité).</li>
       </ul>
       <div class="row">
@@ -665,7 +674,7 @@ function renderSettings() {
         <div class="field"><label>Par adversaire battu</label><input type="number" step="0.5" data-bind="setting" data-key="parAdversaire" value="${s.parAdversaire}" ${ro}></div>
         <div class="field"><label>Bonus victoire</label><input type="number" step="0.5" data-bind="setting" data-key="bonusVictoire" value="${s.bonusVictoire}" ${ro}></div>
       </div>
-      <p class="muted">Exemples avec ces réglages : gagner en meilleure balle 2 contre 2 = <b>${ex(2)}</b> pts chacun ·
+      <p class="muted">Exemples avec ces réglages : gagner en équipe 2 contre 2 = <b>${ex(2)}</b> pts chacun ·
         gagner en solo contre 3 joueurs = <b>${ex(3)}</b> pts · gagner en solo contre 5 joueurs = <b>${ex(5)}</b> pts ·
         finir dernier = <b>${fmtNum(s.participation)}</b> pt. Le classement est recalculé automatiquement si tu changes ces valeurs.</p>
     </div>
