@@ -45,6 +45,12 @@
       "holes": 18
     },
     {
+      "id": "wilds",
+      "name": "The Wilds",
+      "par": 72,
+      "holes": 18
+    },
+    {
       "id": "wynn",
       "name": "Wynn Golf Club",
       "par": 70,
@@ -201,6 +207,46 @@
       "notes": "Scramble (GS Pro)."
     },
     {
+      "id": "g20260924",
+      "date": "2026-09-24",
+      "courseId": "wilds",
+      "holes": 18,
+      "par": 72,
+      "format": "individuel",
+      "teams": [
+        {
+          "players": [
+            "charles"
+          ],
+          "score": 96
+        },
+        {
+          "players": [
+            "jay"
+          ],
+          "score": 79
+        },
+        {
+          "players": [
+            "luc"
+          ],
+          "score": 100
+        }
+      ],
+      "stats": {
+        "charles": {
+          "birdies": 2
+        },
+        "jay": {
+          "birdies": 1
+        },
+        "luc": {
+          "birdies": 1
+        }
+      },
+      "notes": "Stroke play (GS Pro)."
+    },
+    {
       "id": "g20261001",
       "date": "2026-10-01",
       "courseId": "rumbling",
@@ -305,5 +351,5 @@
       "notes": "Scramble (GS Pro)."
     }
   ],
-  "updatedAt": "2026-10-30T22:38:21.000Z"
+  "updatedAt": "2026-10-30T22:41:07.000Z"
 }

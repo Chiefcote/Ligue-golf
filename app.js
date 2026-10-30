@@ -135,10 +135,11 @@ async function load() {
       if (editor && local && local.updatedAt && local.updatedAt !== local.syncedAt && local.updatedAt > (cloud.updatedAt || '')) {
         db = local; schedulePush(); return;
       }
-      // Espace en ligne encore vide alors que le fichier du site contient des parties : on part du fichier.
-      if (!cloud.games.length) {
-        const site = await fetchSiteData();
-        if (site.games.length) { db = site; cacheLocal(); if (editor) schedulePush(); return; }
+      // Le fichier du site est plus récent (ex. parties ajoutées par Claude) : on part du fichier.
+      const site = await fetchSiteData();
+      if (site.games.length && (!cloud.games.length || (site.updatedAt || '') > (cloud.updatedAt || ''))) {
+        if (cloud.games.length) { db = cloud; backup('Version du site chargée.'); tabState.undo = null; }
+        db = site; cacheLocal(); if (editor) schedulePush(); return;
       }
       if (local && local.games.length > cloud.games.length) { db = local; backup('Version en ligne chargée.'); tabState.undo = null; }
       db = cloud; db.syncedAt = db.updatedAt; cacheLocal();
