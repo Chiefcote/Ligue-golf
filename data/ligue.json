@@ -85,6 +85,12 @@
       "name": "Bear Creek Golf Club",
       "par": 72,
       "holes": 18
+    },
+    {
+      "id": "whistler",
+      "name": "Whistler Nicklaus North",
+      "par": 71,
+      "holes": 18
     }
   ],
   "games": [
@@ -395,7 +401,33 @@
       ],
       "stats": {},
       "notes": "Scramble (GS Pro)."
+    },
+    {
+      "id": "g20261105",
+      "date": "2026-11-05",
+      "courseId": "whistler",
+      "holes": 18,
+      "par": 71,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "jay",
+            "luc"
+          ],
+          "score": 75
+        },
+        {
+          "players": [
+            "charles",
+            "duss"
+          ],
+          "score": 72
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
     }
   ],
-  "updatedAt": "2026-10-30T22:46:19.000Z"
+  "updatedAt": "2026-11-06T02:28:28.000Z"
 }
