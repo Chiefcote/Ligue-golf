@@ -435,6 +435,25 @@
       "notes": "Scramble (GS Pro)."
     },
     {
+      "id": "g20261106",
+      "date": "2026-11-06",
+      "courseId": "cabot",
+      "holes": 18,
+      "par": 72,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "charles",
+            "luc"
+          ],
+          "score": 69
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble, Charles et Luc dans la même équipe (GS Pro)."
+    },
+    {
       "id": "g20261112",
       "date": "2026-11-12",
       "courseId": "shadow-ridge",
@@ -456,5 +475,5 @@
       "notes": "4 balles meilleure balle, les 4 joueurs dans la même équipe (GS Pro)."
     }
   ],
-  "updatedAt": "2026-11-13T01:55:15.000Z"
+  "updatedAt": "2026-11-15T22:43:09.000Z"
 }
