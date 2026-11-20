@@ -97,6 +97,12 @@
       "name": "Shadow Ridge Country Club",
       "par": 72,
       "holes": 18
+    },
+    {
+      "id": "kapalua",
+      "name": "Kapalua – Plantation Course",
+      "par": 73,
+      "holes": 18
     }
   ],
   "games": [
@@ -473,7 +479,33 @@
       ],
       "stats": {},
       "notes": "4 balles meilleure balle, les 4 joueurs dans la même équipe (GS Pro)."
+    },
+    {
+      "id": "g20261119",
+      "date": "2026-11-19",
+      "courseId": "kapalua",
+      "holes": 18,
+      "par": 73,
+      "format": "equipe",
+      "teams": [
+        {
+          "players": [
+            "berr",
+            "jay"
+          ],
+          "score": 79
+        },
+        {
+          "players": [
+            "duss",
+            "luc"
+          ],
+          "score": 79
+        }
+      ],
+      "stats": {},
+      "notes": "Scramble (GS Pro)."
     }
   ],
-  "updatedAt": "2026-11-15T22:43:09.000Z"
+  "updatedAt": "2026-11-20T03:21:38.000Z"
 }
